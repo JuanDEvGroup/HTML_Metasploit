@@ -1,0 +1,345 @@
+<html><head>
+<title>Metasploit Console Simulator</title>
+<style>
+  body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    font-family: 'Courier New', monospace;
+    background-color: #000;
+    color: #00ff00;
+    overflow: hidden;
+  }
+  #terminal {
+    height: 100%;
+    padding: 10px;
+    box-sizing: border-box;
+    overflow-y: auto;
+  }
+  #input-line {
+    display: flex;
+    align-items: center;
+  }
+  #prompt {
+    margin-right: 5px;
+  }
+  #command-input {
+    flex-grow: 1;
+    background: transparent;
+    border: none;
+    color: #00ff00;
+    font-family: inherit;
+    font-size: inherit;
+    outline: none;
+  }
+  .output-line {
+    margin-bottom: 5px;
+    white-space: pre-wrap;
+  }
+  .success {
+    color: #00ff00;
+  }
+  .error {
+    color: #ff0000;
+  }
+  .warning {
+    color: #ffff00;
+  }
+  #logo {
+    font-family: monospace;
+    white-space: pre;
+    line-height: 1.2;
+    color: #ff0000;
+    margin-bottom: 20px;
+  }
+</style>
+</head>
+<body>
+<div id="terminal">
+  <div id="logo">
+                                  ___          ____
+                              ,-""   `.      < HONK >
+                            ,'  _   e )`-._ /  ----
+                           /  ,' `-._<.===-'
+                          /  /
+                         /  ;
+             _          /   ;
+ (`._    _.-"" ""--..__,'    |
+ <_  `-""                     \
+  <`-                          :
+   (__   <__.                  ;
+     `-.   '-.__.      _.'    /
+        \      `-.__,-'    _,'
+         `._    ,    /__,-'
+            ""._\__,'< <____
+                 | |  `----.`.
+                 | |        \ `.
+                 ; |___      \-``
+                 \   --<
+                  `.`.<
+                    `-'
+  </div>
+  <div id="output"></div>
+  <div id="input-line">
+    <span id="prompt">msf6 ></span>
+    <input type="text" id="command-input" autofocus>
+  </div>
+</div>
+
+<script>
+const output = document.getElementById('output');
+const commandInput = document.getElementById('command-input');
+
+const commands = {
+  'help': `
+Core Commands
+=============
+
+    Command       Description
+    -------       -----------
+    ?             Help menu
+    banner        Display an awesome metasploit banner
+    exit          Exit the console
+    help          Help menu
+    version       Show the framework and console library version numbers
+
+Module Commands
+===============
+
+    Command       Description
+    -------       -----------
+    search        Searches module names and descriptions
+    use           Interact with a module by name or search term/index
+    exploit       Run the current module
+
+Meterpreter Commands
+====================
+
+    Command       Description
+    -------       -----------
+    sysinfo       Gets information about the remote system
+    getuid        Get the user that the server is running as
+    shell         Drop into a system command shell
+    pwd           Print working directory
+    ls            List files
+    upload        Upload a file or directory
+    download      Download a file or directory
+    execute       Execute a command
+    ps            List running processes
+    migrate       Migrate the server to another process
+    screenshot    Capture a screenshot
+    screenshare   Start screen sharing
+    keyscan_start  Start keylogger
+    keyscan_stop   Stop keylogger
+    keyscan_dump   Dump captured keystrokes
+    enumdesktops   Enumerate desktops
+  `,
+  'banner': `
+      .:okOOOkdc'           'cdkOOOko:.
+    .xOOOOOOOOOOOOc       cOOOOOOOOOOOOx.
+   :OOOOOOOOOOOOOOOk,   ,kOOOOOOOOOOOOOOO:
+  'OOOOOOOOOkkkkOOOOO: :OOOOOOOOOOOOOOOOOO'
+  oOOOOOOOO.    .oOOOOoOOOOl.    ,OOOOOOOOo
+  dOOOOOOOO.      .cOOOOOc.      ,OOOOOOOOx
+  lOOOOOOOO.         ;d;         ,OOOOOOOOl
+  .OOOOOOOO.   .;           ;    ,OOOOOOOO.
+   cOOOOOOO.   .OOc.     'oOO.   ,OOOOOOOc
+    oOOOOOO.   .OOOO.   :OOOO.   ,OOOOOOo
+     lOOOOO.   .OOOO.   :OOOO.   ,OOOOOl
+      ;OOOO'   .OOOO.   :OOOO.   ;OOOO;
+       .dOOo   .OOOOocccxOOOO.   xOOd.
+         ,kOl  .OOOOOOOOOOOOO. .dOk,
+           :kk;.OOOOOOOOOOOOO.cOk:
+             ;kOOOOOOOOOOOOOOOk:
+               ,xOOOOOOOOOOOx,
+                 .lOOOOOOOl.
+                    ,dOd,
+                      .
+
+       =[ metasploit v6.1.27-dev                          ]
++ -- --=[ 2180 exploits - 1155 auxiliary - 399 post        ]
++ -- --=[ 596 payloads - 45 encoders - 10 nops             ]
++ -- --=[ 9 evasion                                        ]
+
+Metasploit tip: Enable verbose logging with set VERBOSE true
+  `,
+  'version': `Framework: 6.1.27-dev
+Console  : 6.1.27-dev`,
+  'search': `Matching Modules
+================
+
+   #  Name                                                Disclosure Date  Rank       Check  Description
+   -  ----                                                ---------------  ----       -----  -----------
+   0  exploit/multi/http/apache_mod_cgi_bash_env_exec     2014-09-24       excellent  Yes    Apache mod_cgi Bash Environment Variable Code Injection (Shellshock)
+   1  exploit/unix/webapp/wp_admin_shell_upload           2015-02-21       excellent  Yes    WordPress Admin Shell Upload
+   2  exploit/linux/http/nagios_xi_plugins_check_argv     2019-07-29       excellent  Yes    Nagios XI Plugins Check_argv Command Injection
+   
+(Output truncated for brevity)`,
+  'use': `Please specify a module to use. Example: use exploit/multi/http/apache_mod_cgi_bash_env_exec`,
+  'exit': 'Exiting...',
+  'exploit': `[*] No module selected. Use the 'use' command to select a module first.`,
+  'sysinfo': `Computer        : DESKTOP-ABC123
+OS              : Windows 10 (Build 19042).
+Architecture    : x64
+System Language : en_US
+Domain          : WORKGROUP
+Logged On Users : 2
+Meterpreter     : x64/windows`,
+  'getuid': `Server username: NT AUTHORITY\\SYSTEM`,
+  'shell': `Process 1234 created.
+Channel 1 created.
+Microsoft Windows [Version 10.0.19042.928]
+(c) 2020 Microsoft Corporation. All rights reserved.
+
+C:\\Windows\\system32>`,
+  'pwd': `C:\\Users\\Administrator`,
+  'ls': `Listing: C:\\Users\\Administrator
+
+Mode              Size   Type  Last modified              Name
+----              ----   ----  -------------              ----
+040777/rwxrwxrwx  0      dir   2021-04-15 10:31:44 -0400  .
+040777/rwxrwxrwx  0      dir   2021-04-15 10:31:44 -0400  ..
+100666/rw-rw-rw-  282    fil   2021-04-15 10:31:44 -0400  .bashrc
+100666/rw-rw-rw-  655    fil   2021-04-15 10:31:44 -0400  .profile
+040777/rwxrwxrwx  0      dir   2021-04-15 10:31:44 -0400  Desktop
+040777/rwxrwxrwx  0      dir   2021-04-15 10:31:44 -0400  Documents
+040777/rwxrwxrwx  0      dir   2021-04-15 10:31:44 -0400  Downloads`,
+  'upload': `[*] uploading  : /path/to/local/file.txt -> C:\\Users\\Administrator\\file.txt
+[*] uploaded   : /path/to/local/file.txt -> C:\\Users\\Administrator\\file.txt`,
+  'download': `[*] downloading: C:\\Users\\Administrator\\important.doc -> /path/to/local/important.doc
+[*] download   : C:\\Users\\Administrator\\important.doc -> /path/to/local/important.doc`,
+  'execute': `Process 5678 created.`,
+  'ps': `Process List
+============
+
+ PID   PPID  Name                  Arch  Session  User                          Path
+ ---   ----  ----                  ----  -------  ----                          ----
+ 0     0     [System Process]                                                   
+ 4     0     System                x64   0                                      
+ 88    4     Registry              x64   0                                      
+ 400   4     smss.exe              x64   0                                      
+ 580   568   csrss.exe             x64   0                                      
+ 652   568   wininit.exe           x64   0                                      
+ 660   644   csrss.exe             x64   1                                      
+ 720   644   winlogon.exe          x64   1        NT AUTHORITY\\SYSTEM           C:\\Windows\\System32\\winlogon.exe
+ 764   652   services.exe          x64   0                                      
+ 788   652   lsass.exe             x64   0        NT AUTHORITY\\SYSTEM           C:\\Windows\\System32\\lsass.exe
+ 924   764   svchost.exe           x64   0        NT AUTHORITY\\SYSTEM           C:\\Windows\\System32\\svchost.exe
+ 952   764   svchost.exe           x64   0        NT AUTHORITY\\NETWORK SERVICE  C:\\Windows\\System32\\svchost.exe`,
+  'migrate': `[*] Migrating from 1234 to 5678...
+[*] Migration completed successfully.`,
+  'screenshot': "Screenshot saved to: C:\\Users\\Administrator\\Desktop\\screenshot_001.png",
+  'screenshare': "[*] Starting screen sharing... (Press Ctrl+C to stop)",
+  'keyscan_start': "[*] Starting the keylogger...",
+  'keyscan_stop': "[*] Stopping the keylogger...",
+  'keyscan_dump': "[*] Dumping captured keystrokes:\n[+] username: admin\n[+] password: s3cr3t123\n[+] email: admin@target.com",
+  'enumdesktops': "Desktops\n========\n\nSession  Station  Name\n-------  -------  ----\n       0  WinSta0  Default\n       0  WinSta0  Winlogon\n       0  WinSta0  Disconnect"
+};
+
+let currentModule = null;
+let inMeterpreter = false;
+let keyloggingActive = false;
+let capturedKeystrokes = "";
+
+function addOutput(text, className = '') {
+  const line = document.createElement('div');
+  line.className = `output-line ${className}`;
+  line.textContent = text;
+  output.appendChild(line);
+  output.scrollTop = output.scrollHeight;
+}
+
+function processCommand(command) {
+  addOutput(`${document.getElementById('prompt').textContent} ${command}`);
+  
+  const normalizedCommand = command.trim().toLowerCase();
+  
+  if (inMeterpreter) {
+    if (commands.hasOwnProperty(normalizedCommand)) {
+      if (normalizedCommand === 'screenshot') {
+        simulateScreenshot();
+      } else if (normalizedCommand === 'screenshare') {
+        simulateScreenshare();
+      } else if (normalizedCommand === 'keyscan_start') {
+        keyloggingActive = true;
+        capturedKeystrokes = "";
+      } else if (normalizedCommand === 'keyscan_stop') {
+        keyloggingActive = false;
+      } else if (normalizedCommand === 'keyscan_dump') {
+        addOutput(commands[normalizedCommand] + capturedKeystrokes, 'success');
+        return;
+      }
+      addOutput(commands[normalizedCommand], 'success');
+    } else if (normalizedCommand === 'background' || normalizedCommand === 'exit') {
+      inMeterpreter = false;
+      document.getElementById('prompt').textContent = `msf6 (${currentModule}) >`;
+      addOutput('Meterpreter session 1 backgrounded.', 'success');
+    } else {
+      addOutput(`[-] Unknown command: ${command}`, 'error');
+    }
+  } else {
+    if (normalizedCommand === 'exploit') {
+      if (currentModule) {
+        addOutput(`[*] Exploiting ${currentModule}...`, 'success');
+        addOutput(`[+] Exploitation completed successfully!`, 'success');
+        addOutput(`[*] Meterpreter session 1 opened (10.0.0.1:4444 -> 192.168.1.100:31337)`, 'success');
+        inMeterpreter = true;
+        document.getElementById('prompt').textContent = 'meterpreter >';
+      } else {
+        addOutput(commands['exploit'], 'error');
+      }
+    } else if (commands.hasOwnProperty(normalizedCommand)) {
+      addOutput(commands[normalizedCommand], 'success');
+      if (normalizedCommand === 'exit') {
+        setTimeout(() => {
+          addOutput('Metasploit console simulation closed. Refresh the page to restart.', 'warning');
+          commandInput.disabled = true;
+        }, 1000);
+      }
+    } else if (normalizedCommand.startsWith('use ')) {
+      currentModule = command.slice(4);
+      addOutput(`[*] Using module ${currentModule}`, 'success');
+      document.getElementById('prompt').textContent = `msf6 (${currentModule}) >`;
+    } else {
+      addOutput(`[-] Unknown command: ${command}`, 'error');
+    }
+  }
+}
+
+commandInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    const command = commandInput.value;
+    processCommand(command);
+    commandInput.value = '';
+  } else if (keyloggingActive && e.key.length === 1) {
+    capturedKeystrokes += e.key;
+  }
+});
+
+function simulateScreenshot() {
+  const canvas = document.createElement('canvas');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'black';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = 'green';
+  ctx.font = '20px monospace';
+  ctx.fillText('Simulated Target Desktop', 20, 40);
+  
+  const screenshotData = canvas.toDataURL('image/png');
+  const screenshotLink = document.createElement('a');
+  screenshotLink.href = screenshotData;
+  screenshotLink.download = 'screenshot_001.png';
+  screenshotLink.click();
+}
+
+function simulateScreenshare() {
+  const shareWindow = window.open('', 'Screen Share', 'width=800,height=600');
+  shareWindow.document.write('<html><head><title>Screen Share</title></head><body style="background-color: black; color: green; font-family: monospace;"><h1>Simulated Target Desktop</h1><p>Screen sharing in progress...</p></body></html>');
+}
+
+addOutput('Metasploit Framework Console Simulator', 'warning');
+addOutput('Type "help" for available commands', 'warning');
+</script>
+</body></html>
