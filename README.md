@@ -1,6 +1,8 @@
 # HTML_Metasploit
 A metasploit console simulator in HTML (Hyper Text Makeup Language).
 
+Created by Juan DEV
+
 
 ## Usage
 
